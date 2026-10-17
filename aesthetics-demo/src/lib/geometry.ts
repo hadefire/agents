@@ -219,7 +219,7 @@ export function defaultFront(w: number, h: number): FrontFace {
 }
 
 export function defaultSide(w: number, h: number, facing: Facing): SideFace {
-  const nose = facing === "left" ? 0.38 : 0.62;
+  const nose = w * (facing === "left" ? 0.38 : 0.62);
   const back = facing === "left" ? 1 : -1;
   return {
     facing,

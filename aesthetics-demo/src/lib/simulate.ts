@@ -1,4 +1,5 @@
 import {
+  baseLipCurves,
   creaseOffsets,
   faceCenterX,
   lidPolyline,
@@ -48,20 +49,15 @@ export function simulateFront(src: Raster, face: FrontFace, request: SimRequest)
 
   if (request.procedures.lip) {
     const lips = lipPolylines(face, request.lipLevel);
-    const moves = [
-      ...lips.upper.map((to, i) => ({ from: lipPolylines(face, "mild").upper[i] ? originalUpper(face)[i] : to, to })),
-    ];
-    const originalU = originalUpper(face);
-    const originalL = originalLower(face);
+    const original = baseLipCurves(face);
     const lipMoves = [
-      ...lips.upper.map((to, i) => ({ from: originalU[i], to })),
-      ...lips.lower.map((to, i) => ({ from: originalL[i], to })),
+      ...lips.upper.map((to, i) => ({ from: original.upper[i], to })),
+      ...lips.lower.map((to, i) => ({ from: original.lower[i], to })),
     ].filter((m) => Math.hypot(m.from.x - m.to.x, m.from.y - m.to.y) > 0.4);
-    const box = ellipseOf([...originalU, ...originalL, ...lips.upper, ...lips.lower], 16);
+    const box = ellipseOf([...original.upper, ...original.lower, ...lips.upper, ...lips.lower], 16);
     raster = warpEllipse(raster, box.c, Math.max(box.rx, 20), Math.max(box.ry, 18), lipMoves);
     shadeSegment(raster, face.mouthLeft, face.cupid, [255, 246, 240, 0.18], 2.2);
     shadeSegment(raster, face.cupid, face.mouthRight, [255, 246, 240, 0.18], 2.2);
-    void moves;
   }
 
   if (request.procedures.corner) {
@@ -84,21 +80,6 @@ export function simulateFront(src: Raster, face: FrontFace, request: SimRequest)
     drawEyelid(raster, face, request);
   }
   return raster;
-}
-
-function originalUpper(face: FrontFace): Pt[] {
-  return lipPolylines({ ...face }, "mild").upper.map((_, i, arr) => arr[i]);
-}
-
-function originalLower(face: FrontFace): Pt[] {
-  const slit = (face.upperMid.y + face.lowerMid.y) / 2;
-  const base = lipPolylines(face, "mild");
-  return base.lower.map((p, i, arr) => {
-    if (i === 0 || i === arr.length - 1) return { x: p.x, y: p.y };
-    const extras = 0.06 * 1.6;
-    const y = slit + (p.y - slit) / (1 + extras);
-    return { x: p.x, y };
-  });
 }
 
 function drawEyelid(raster: Raster, face: FrontFace, request: SimRequest): void {
