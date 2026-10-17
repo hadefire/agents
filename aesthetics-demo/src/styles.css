@@ -100,8 +100,11 @@ button:focus-visible, input:focus-visible, summary:focus-visible { outline: 3px 
 .capture-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
 .upload-card { min-width: 0; background: var(--paper); border: 1px solid var(--line); box-shadow: 0 12px 32px rgba(45,57,54,.05); }
 .upload-preview { height: 300px; display: grid; place-items: center; position: relative; overflow: hidden; background: #d5dad6; }
+.upload-card.has-photo .upload-preview { height: auto; aspect-ratio: var(--photo-aspect); }
 .upload-preview::after { content: ""; position: absolute; inset: 14px; border: 1px solid rgba(255,255,255,.32); pointer-events: none; }
-.upload-preview img { width: 100%; height: 100%; object-fit: contain; }
+.upload-preview img { width: 100%; height: 100%; display: block; object-fit: contain; }
+.face-region { width: 100%; height: 100%; position: absolute; inset: 0; z-index: 1; pointer-events: none; }
+.face-region rect { fill: rgba(104,143,126,.08); stroke: #d9f4e5; stroke-width: 2; vector-effect: non-scaling-stroke; filter: drop-shadow(0 1px 3px rgba(26,47,39,.65)); }
 .face-guide { width: 136px; height: 191px; border: 1px dashed rgba(74,94,87,.65); border-radius: 48% 48% 43% 43%; position: relative; }
 .face-guide::before, .face-guide::after { content: ""; position: absolute; left: -28px; right: -28px; top: 52%; border-top: 1px solid rgba(255,255,255,.5); }
 .face-guide::after { left: 50%; top: -26px; bottom: -26px; right: auto; border-top: 0; border-left: 1px solid rgba(255,255,255,.5); }

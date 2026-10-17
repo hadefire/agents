@@ -2,14 +2,50 @@ import { FaceLandmarker, FilesetResolver } from "@mediapipe/tasks-vision";
 import { dist } from "./geometry";
 import type { FrontFace, Pt } from "./types";
 
+export type FaceBounds = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
 export type Detection = {
   face: FrontFace;
+  bounds: FaceBounds | null;
   irisDiameterPx: number | null;
   intercanthalPx: number;
   source: "mediapipe" | "fallback";
 };
 
 let landmarkerPromise: Promise<FaceLandmarker> | null = null;
+
+export function faceBoundsFromLandmarks(
+  landmarks: { x: number; y: number }[],
+  width: number,
+  height: number,
+): FaceBounds | null {
+  const valid = landmarks.filter((landmark) => Number.isFinite(landmark.x) && Number.isFinite(landmark.y));
+  if (!valid.length || width <= 0 || height <= 0) return null;
+  const xs = valid.map((landmark) => landmark.x * width);
+  const ys = valid.map((landmark) => landmark.y * height);
+  const left = Math.max(0, Math.min(...xs));
+  const top = Math.max(0, Math.min(...ys));
+  const right = Math.min(width, Math.max(...xs));
+  const bottom = Math.min(height, Math.max(...ys));
+  const boxWidth = right - left;
+  const boxHeight = bottom - top;
+  if (boxWidth <= 0 || boxHeight <= 0) return null;
+  const padX = boxWidth * 0.04;
+  const padY = boxHeight * 0.04;
+  const x = Math.max(0, left - padX);
+  const y = Math.max(0, top - padY);
+  return {
+    x,
+    y,
+    width: Math.min(width, right + padX) - x,
+    height: Math.min(height, bottom + padY) - y,
+  };
+}
 
 function getLandmarker(): Promise<FaceLandmarker> {
   if (!landmarkerPromise) {
@@ -54,6 +90,7 @@ export async function detectFront(image: HTMLCanvasElement | HTMLImageElement | 
     const rightIris = dist(p(474), p(476));
     return {
       face,
+      bounds: faceBoundsFromLandmarks(landmarks, width, height),
       irisDiameterPx: (leftIris + rightIris) / 2,
       intercanthalPx: dist(face.imageLeftEye.inner, face.imageRightEye.inner),
       source: "mediapipe",

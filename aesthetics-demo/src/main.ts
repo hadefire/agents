@@ -20,6 +20,7 @@ type Photo = {
   url: string;
   image: HTMLImageElement;
   raster: Raster;
+  revoke: (() => void) | null;
 };
 
 type Results = {
@@ -173,13 +174,22 @@ function pageHead(kicker: string, title: string, copy: string): string {
   return `<div class="page-head"><div><p class="eyebrow ink">${kicker}</p><h1>${title}</h1><p>${copy}</p></div><div class="step-count"><b>0${state.step}</b><span>/ 04</span></div></div>`;
 }
 
+function detectionOverlay(kind: "front" | "side", photo: Photo): string {
+  if (kind !== "front" || state.detection?.source !== "mediapipe" || !state.detection.bounds) return "";
+  const { x, y, width, height } = state.detection.bounds;
+  return `<svg class="face-region" viewBox="0 0 ${photo.raster.width} ${photo.raster.height}" preserveAspectRatio="xMidYMid meet" aria-label="检测到的脸部区域">
+    <rect x="${x}" y="${y}" width="${width}" height="${height}" rx="${Math.min(width, height) * 0.08}"></rect>
+  </svg>`;
+}
+
 function uploadCard(kind: "front" | "side"): string {
   const photo = kind === "front" ? state.front : state.side;
   const title = kind === "front" ? "正脸照片" : "侧脸照片";
   const tip = kind === "front" ? "平视镜头，完整露出眉、眼、鼻、唇" : "头部转至 90°，露出鼻尖与下巴轮廓";
   return `<article class="upload-card ${photo ? "has-photo" : ""}">
-    <div class="upload-preview">
+    <div class="upload-preview"${photo ? ` style="--photo-aspect: ${photo.image.naturalWidth} / ${photo.image.naturalHeight}"` : ""}>
       ${photo ? `<img src="${photo.url}" alt="${title}预览">` : `<div class="face-guide ${kind}"><span></span></div>`}
+      ${photo ? detectionOverlay(kind, photo) : ""}
       <div class="view-tag">${kind === "front" ? "FRONT · 0°" : "PROFILE · 90°"}</div>
       ${photo ? `<div class="photo-ok">✓ 已就绪</div>` : ""}
     </div>
@@ -459,6 +469,8 @@ function bindEvents(): void {
 }
 
 async function setPhoto(kind: "front" | "side", photo: Photo): Promise<void> {
+  const previous = kind === "front" ? state.front : state.side;
+  if (previous !== photo) previous?.revoke?.();
   if (kind === "front") {
     state.front = photo;
     state.detecting = true;
@@ -468,6 +480,7 @@ async function setPhoto(kind: "front" | "side", photo: Photo): Promise<void> {
     const detected = await detectFront(canvas, photo.raster.width, photo.raster.height);
     state.detection = detected ?? {
       face: defaultFront(photo.raster.width, photo.raster.height),
+      bounds: null,
       irisDiameterPx: null,
       intercanthalPx: photo.raster.width * 0.22,
       source: "fallback",
@@ -482,21 +495,26 @@ async function setPhoto(kind: "front" | "side", photo: Photo): Promise<void> {
 
 async function photoFromFile(file: File): Promise<Photo> {
   const url = URL.createObjectURL(file);
-  const image = await loadImage(url);
-  const max = 960;
-  const ratio = Math.min(1, max / Math.max(image.naturalWidth, image.naturalHeight));
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.max(1, Math.round(image.naturalWidth * ratio));
-  canvas.height = Math.max(1, Math.round(image.naturalHeight * ratio));
-  const context = canvas.getContext("2d", { willReadFrequently: true })!;
-  context.drawImage(image, 0, 0, canvas.width, canvas.height);
-  const displayUrl = canvas.toDataURL("image/jpeg", 0.92);
-  return {
-    name: file.name,
-    url: displayUrl,
-    image: await loadImage(displayUrl),
-    raster: { width: canvas.width, height: canvas.height, data: context.getImageData(0, 0, canvas.width, canvas.height).data },
-  };
+  try {
+    const image = await loadImage(url);
+    const max = 960;
+    const ratio = Math.min(1, max / Math.max(image.naturalWidth, image.naturalHeight));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(image.naturalWidth * ratio));
+    canvas.height = Math.max(1, Math.round(image.naturalHeight * ratio));
+    const context = canvas.getContext("2d", { willReadFrequently: true })!;
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+    return {
+      name: file.name,
+      url,
+      image,
+      raster: { width: canvas.width, height: canvas.height, data: context.getImageData(0, 0, canvas.width, canvas.height).data },
+      revoke: () => URL.revokeObjectURL(url),
+    };
+  } catch (error) {
+    URL.revokeObjectURL(url);
+    throw error;
+  }
 }
 
 function loadImage(url: string): Promise<HTMLImageElement> {
@@ -516,6 +534,7 @@ async function photoFromCanvas(canvas: HTMLCanvasElement, name: string): Promise
     url,
     image: await loadImage(url),
     raster: { width: canvas.width, height: canvas.height, data: context.getImageData(0, 0, canvas.width, canvas.height).data },
+    revoke: null,
   };
 }
 
@@ -605,10 +624,13 @@ function drawSideSample(): HTMLCanvasElement {
 }
 
 async function useSample(): Promise<void> {
+  state.front?.revoke?.();
+  state.side?.revoke?.();
   state.front = await photoFromCanvas(drawFrontSample(), "示例正脸.jpg");
   state.side = await photoFromCanvas(drawSideSample(), "示例侧脸.jpg");
   state.detection = {
     face: defaultFront(state.front.raster.width, state.front.raster.height),
+    bounds: null,
     irisDiameterPx: null,
     intercanthalPx: state.front.raster.width * 0.22,
     source: "fallback",
@@ -691,6 +713,8 @@ function downloadCurrent(): void {
 }
 
 function resetSession(): void {
+  state.front?.revoke?.();
+  state.side?.revoke?.();
   state.step = 1;
   state.front = null;
   state.side = null;

@@ -13,6 +13,7 @@ import {
   resolveScale,
   visibleCreaseMm,
 } from "../src/lib/params";
+import { faceBoundsFromLandmarks } from "../src/lib/detect";
 import { warpEllipse } from "../src/lib/warp";
 import type { Raster } from "../src/lib/types";
 
@@ -68,6 +69,22 @@ describe("procedure geometry", () => {
     expect(side.tip.x).toBeGreaterThan(100);
     expect(result.rhinion.x).toBeLessThan(side.rhinion.x);
     expect(result.tip.x).toBeLessThan(side.tip.x);
+  });
+});
+
+describe("face detection bounds", () => {
+  it("uses every landmark and clamps the padded box to the image", () => {
+    const bounds = faceBoundsFromLandmarks([
+      { x: 0.1, y: 0.2 },
+      { x: 0.5, y: 0.45 },
+      { x: 0.9, y: 0.8 },
+    ], 1000, 500);
+    expect(bounds).toEqual({ x: 68, y: 88, width: 864, height: 324 });
+  });
+
+  it("does not create a box without valid landmarks", () => {
+    expect(faceBoundsFromLandmarks([], 960, 720)).toBeNull();
+    expect(faceBoundsFromLandmarks([{ x: Number.NaN, y: 0.5 }], 960, 720)).toBeNull();
   });
 });
 
