@@ -49,7 +49,8 @@ type AppState = {
 };
 
 const state: AppState = {
-  loggedIn: false,
+  // 调试阶段直接进入采集页；恢复登录时改回 false 即可。
+  loggedIn: true,
   step: 1,
   front: null,
   side: null,
@@ -142,7 +143,7 @@ function shell(content: string): string {
   return `<div class="app-shell">
     <header class="topbar">
       <div class="brand"><span class="brand-mark">澄</span><span>澄境咨询台</span><em>内部演示</em></div>
-      <div class="session-meta"><span class="privacy-dot"></span>影像仅在本机处理 <span class="divider"></span> 操作员：李顾问 <button id="logout" class="icon-button" title="退出">↗</button></div>
+      <div class="session-meta"><span class="privacy-dot"></span>影像仅在本机处理 <span class="divider"></span> 操作员：李顾问 <span class="debug-badge">调试模式</span></div>
     </header>
     <div class="workspace">
       <aside class="sidebar">
@@ -362,10 +363,6 @@ function bindEvents(): void {
     } else {
       document.querySelector<HTMLElement>("#login-error")!.hidden = false;
     }
-  });
-  document.querySelector("#logout")?.addEventListener("click", () => {
-    state.loggedIn = false;
-    render();
   });
   document.querySelectorAll<HTMLButtonElement>("[data-step]").forEach((button) =>
     button.addEventListener("click", () => {
